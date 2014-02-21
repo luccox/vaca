@@ -9,25 +9,22 @@ from multiprocessing.managers import SyncManager
 
 class Plankton(object):
     def __init__(self, host='localhost', port=10001, auth_key='chaetognata'):
-        self.host = host
-        self.port = port
-        self.auth_key = auth_key
-        print 'Plankton started'
-
+        qm = self._create_queue_client(host, port, auth_key)
+        self.q_in = qm.get_queue_in()
+        self.q_out = qm.get_queue_out()
 
     def boot(self):
-        self.qm = self._create_queue_client(self.host, self.port, self.auth_key)
-        self.q_in = self.qm.get_queue_in()
-        self.q_out = self.qm.get_queue_out()
         init_data = self.q_in.get()
         self.capacity = init_data[0]
         self.mutation = init_data[1]
-        self.wally = init_data[2]
-        print 'wally', self.wally.shape
-        self.meteo = init_data[3]
-        print 'meteo', self.meteo.shape
-        self.nada = init_data[4]
-        print 'nada', self.nada.shape
+        self.initial_row = init_data[2]
+        print 'initial_row --> ', self.initial_row
+        self.wally = init_data[3]
+        print 'wally.shape --> ', self.wally.shape
+        self.meteo = init_data[4]
+        print 'meteo.shape --> ', self.meteo.shape
+        self.nada = init_data[5]
+        print 'nada.shape --> ', self.nada.shape
 
 
     def _create_queue_client(self, host, port, auth_key):
@@ -141,7 +138,7 @@ class Plankton(object):
 
 
     def _free_cells(self, pos):
-        size = self.wally.shape[0]
+        size = self.wally.shape[1] # wally.shape (49, 100, 10, 12)
         x = [i for i in [pos[0]-1, pos[0], pos[0]+1] if 0 <= i <= size-1]
         y = [j for j in [pos[1]-1, pos[1], pos[1]+1] if 0 <= j <= size-1]
         d = random.choice([(i,j) for i in x for j in y if self.nada[i,j]])
@@ -152,86 +149,93 @@ class Plankton(object):
     def loop(self):
         #if self.q_in.qsize():
         try:
-            tick, rookies = self.q_in.get()
+            command = self.q_in.get()
         except EOFError:
             sys.exit('Connection to GAIA lost')
-        new_rookies = {}
 
-        for x in xrange(self.wally.shape[0]):
-            for y in xrange(self.wally.shape[1]):
-                chunk = self.wally[x,y]
+        if len(command):
+            tick, rookies = command[0], command[1]
+            new_rookies = {}
 
-                # insert rookies
-                if (x,y) in rookies.keys():
-                    for p in rookies[(x,y)]:
-                        if chunk[chunk[:,0]!=0,0].shape[0] < self.capacity:
-                            p = self._mutate(p, tick)
-                            chunk = numpy.vstack([chunk, p])
+            for x in xrange(self.wally.shape[0]):
+                xx = x + self.initial_row
+                for y in xrange(self.wally.shape[1]):
+                    chunk = self.wally[x,y]
 
-                # metabolismo
-                if not numpy.all(chunk==0):
-                    sol, lluvia, pool = self.meteo[(tick/100)%10, x, y]
-                    #print '################################################'
-                    #print 'Fito - meteo - sol, lluvia, pool--> ', sol, lluvia, pool
-                    for p in chunk:
-                        if p[0]:
-                            #print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
-                            p_start = p[1]
-                            p_nrg = p[2]/1000.0
-                            f_max = p[4]/10
-                            f_num = p[5]/10
-                            f_nrg = p[6]/1000.0
-                            f_sex = p[7]/1000.0
-                            f_luz = p[8]/100.0
-                            f_agua = p[9]/100.0
-                            f_pool = p[10]/100.0
-                            f_meta = p[11]/1000.0
-                            p_luz = 0.0
-                            p_agua = 0.0
-                            p_pool = 0.0
-                            #print 'Fito - plankton - p_start,p_nrg, f_max, f_num, f_nrg, f_sex, \
-                            #           f_luz, f_agua,f_pool, f_meta, p_luz,p_agua, p_pool --> ', \
-                            #           p_start,p_nrg, f_max, f_num, f_nrg, f_sex, f_luz, f_agua,f_pool, \
-                            #           f_meta, p_luz,p_agua, p_pool
-                            if sol:
-                                p_luz, sol = self._in_luz(sol, f_luz, f_meta)
-                                #print 'Fito - p_luz, sol --> ', p_luz, sol
-                            if lluvia:
-                                p_agua, lluvia = self._in_agua(lluvia, f_agua, f_meta)
-                                #print 'Fito - p_agua, lluvia --> ', p_agua, lluvia
-                            if pool:
-                                p_pool, pool = self._in_pool(pool, f_pool, f_meta)
-                                #print 'Fito - p_pool, pool --> ', p_pool, pool
+                    # insert rookies
+                    if (xx,y) in rookies.keys():
+                        for p in rookies[(xx,y)]:
+                            if chunk[chunk[:,0]!=0,0].shape[0] < self.capacity:
+                                p = self._mutate(p, tick)
+                                chunk = numpy.vstack([chunk, p])
 
-                            p_nrg_post_meta = self._metabolize(p_start, tick, f_max, p_nrg, p_luz, p_agua, p_pool, f_meta)
-                            #print 'Fito - p_nrg_post_meta --> ', p_nrg_post_meta
-                            if p_nrg_post_meta > 0:
-                                # sex
-                                hubo_mambito, p_nrg_post_sex = self._sex(p_nrg_post_meta, f_num, f_nrg, f_sex)
-                                #print 'Fito - hubo_mambito, p_nrg_post_sex --> ', hubo_mambito, p_nrg_post_sex
-                                if hubo_mambito:
-                                    for i in xrange(int(f_num)):
-                                        d = self._free_cells((x,y))
-                                        if d not in new_rookies.keys():
-                                            new_rookies[d] = []
-                                        new_rookies[d].append(p.tolist())
-                                    p[2] = int(p_nrg_post_sex*1000)
-                                    #print 'Fito - final --> ', p[2]
+                    # metabolismo
+                    if not numpy.all(chunk==0):
+                        sol, lluvia, pool = self.meteo[(tick/100)%10, x, y]
+                        #print '################################################'
+                        #print 'Fito - meteo - sol, lluvia, pool--> ', sol, lluvia, pool
+                        for p in chunk:
+                            if p[0]:
+                                #print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+                                p_start = p[1]
+                                p_nrg = p[2]/1000.0
+                                f_max = p[4]/10
+                                f_num = p[5]/10
+                                f_nrg = p[6]/1000.0
+                                f_sex = p[7]/1000.0
+                                f_luz = p[8]/100.0
+                                f_agua = p[9]/100.0
+                                f_pool = p[10]/100.0
+                                f_meta = p[11]/1000.0
+                                p_luz = 0.0
+                                p_agua = 0.0
+                                p_pool = 0.0
+                                #print 'Fito - plankton - p_start,p_nrg, f_max, f_num, f_nrg, f_sex, \
+                                #           f_luz, f_agua,f_pool, f_meta, p_luz,p_agua, p_pool --> ', \
+                                #           p_start,p_nrg, f_max, f_num, f_nrg, f_sex, f_luz, f_agua,f_pool, \
+                                #           f_meta, p_luz,p_agua, p_pool
+                                if sol:
+                                    p_luz, sol = self._in_luz(sol, f_luz, f_meta)
+                                    #print 'Fito - p_luz, sol --> ', p_luz, sol
+                                if lluvia:
+                                    p_agua, lluvia = self._in_agua(lluvia, f_agua, f_meta)
+                                    #print 'Fito - p_agua, lluvia --> ', p_agua, lluvia
+                                if pool:
+                                    p_pool, pool = self._in_pool(pool, f_pool, f_meta)
+                                    #print 'Fito - p_pool, pool --> ', p_pool, pool
+
+                                p_nrg_post_meta = self._metabolize(p_start, tick, f_max, p_nrg, p_luz, p_agua, p_pool, f_meta)
+                                #print 'Fito - p_nrg_post_meta --> ', p_nrg_post_meta
+                                if p_nrg_post_meta > 0:
+                                    # sex
+                                    hubo_mambito, p_nrg_post_sex = self._sex(p_nrg_post_meta, f_num, f_nrg, f_sex)
+                                    #print 'Fito - hubo_mambito, p_nrg_post_sex --> ', hubo_mambito, p_nrg_post_sex
+                                    if hubo_mambito:
+                                        for i in xrange(int(f_num)):
+                                            d = self._free_cells((xx,y))
+                                            if d not in new_rookies.keys():
+                                                new_rookies[d] = []
+                                            new_rookies[d].append(p.tolist())
+                                            print '+ rookie ', d
+                                        p[2] = int(p_nrg_post_sex*1000)
+                                        #print 'Fito - final --> ', p[2]
+                                    else:
+                                        p[2] = int(p_nrg_post_meta*1000)
+                                        #print 'Fito - final --> ', p[2]
                                 else:
-                                    p[2] = int(p_nrg_post_meta*1000)
-                                    #print 'Fito - final --> ', p[2]
-                            else:
-                                p = [0,0,0,0,0,0,0,0,0,0,0,0]
-                                #print 'Fito - muerte'
+                                    p = [0,0,0,0,0,0,0,0,0,0,0,0]
+                                    #print 'Fito - muerte'
 
-                c_nz = chunk[chunk[:,0]!=0]
-                if len(c_nz) < self.capacity:
-                    chunk = numpy.vstack([c_nz, numpy.zeros((self.capacity-len(c_nz),12), float)])
-                else:
-                    chunk = c_nz[:self.capacity]
+                    c_nz = chunk[chunk[:,0]!=0]
+                    if len(c_nz) < self.capacity:
+                        chunk = numpy.vstack([c_nz, numpy.zeros((self.capacity-len(c_nz),12), float)])
+                    else:
+                        chunk = c_nz[:self.capacity]
 
-                self.wally[x,y] = chunk
+                    self.wally[x,y] = chunk
 
-        self.q_out.put(new_rookies)
+            self.q_out.put(new_rookies)
 
-
+        else:
+            print 'updating GAIA...'
+            self.q_out.put(self.wally)

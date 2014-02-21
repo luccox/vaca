@@ -59,16 +59,17 @@ class Kami(object):
                                                              self.qm[p]['q_in'],
                                                              self.qm[p]['q_out'])
 
+
     def _populate_plankton(self):
         portions = utils.chunks(range(self.wally.shape[0]),
                                 self.wally.shape[0]/len(self.qm.keys()))
         for p in self.qm.keys():
             r = portions.next()
             self.qm[p]['range'] = (r[0], r[-1])
-            self.qm[p]['q_in'].put([self.capacity, self.mutation,
+            self.qm[p]['q_in'].put([self.capacity, self.mutation,r[0],
                                     self.wally[r[0]:r[-1]],
-                                    self.meteo[r[0]:r[-1]],
-                                    self.nada[r[0]:r[-1]]])
+                                    self.meteo[:,r[0]:r[-1]],
+                                    self.nada])
 
 
     def loop(self):
@@ -85,7 +86,7 @@ class Kami(object):
                         rookies[r] = []
                     for rr in self.rookies[r]:
                         rookies[r].append(rr)
-            self.qm[0]['q_in'].put((self.tick, rookies))
+            self.qm[p]['q_in'].put([self.tick, rookies])
 
         # rookies out
         self.rookies = {}
@@ -103,24 +104,40 @@ class Kami(object):
 
         print 'Looping... %i - %.2f secs' % (self.tick, time.time()-t_loop)
         if not self.tick % self.savepoint:
+            print 'CheckPoint!... %i' % self.tick
             self.checkpoint()
 
 
+    def _update_request(self):
+        # in
+        for p in self.qm.keys():
+            self.qm[p]['q_in'].put([])
+
+        # out
+        plankton = range(len(self.qm.keys()))
+        while len(plankton):
+            for p in plankton:
+                if self.qm[p]['q_out'].qsize():
+                    plankton.remove(p)
+                    wally = self.qm[p]['q_out'].get()
+                    r = self.qm[p]['range']
+                    self.wally[r[0]:r[-1]] = wally
+
+
+
     def checkpoint(self):
-        print 'SavePoint... %i' % self.tick
+        self._update_request()
         self.conn.root['conf']['tick'] = self.tick
         self.conn.root['wally'] = self.wally
         self.conn.root['rookies'] = self.rookies
         self.conn.commit()
 
     def close(self):
-        for c in self.qm:
-            self.qm[c]['server'].shutdown()
-        self.conn.root['conf']['tick'] = self.tick
-        self.conn.root['wally'] = self.wally
-        self.conn.root['rookies'] = self.rookies
+        self.checkpoint()
         self.conn.close()
         self.db.close()
+        for c in self.qm:
+            self.qm[c]['server'].shutdown()
 
         print '\nclosing GAIA... bye bye\n'
 
