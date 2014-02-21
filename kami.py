@@ -2,6 +2,7 @@
 
 
 import time
+import numpy
 import multiprocessing
 from multiprocessing.managers import SyncManager
 
@@ -10,8 +11,8 @@ import utils
 
 
 class Kami(object):
-    def __init__(self, n_plankton=1, savepoint=100):
-        print '\nLoading Kami 5.1\n'
+    def __init__(self, host, n_plankton=1, savepoint=100):
+        print '\nLoading Kami 5.2\n'
 
         self.savepoint = savepoint
 
@@ -28,7 +29,7 @@ class Kami(object):
         self.wally = self.conn.root['wally']
         self.rookies = self.conn.root['rookies']
 
-        self._create_managers(n_plankton)
+        self._create_managers(host, n_plankton)
         self._populate_plankton()
 
 
@@ -45,8 +46,8 @@ class Kami(object):
         return manager
 
 
-    def _create_managers(self, n_plankton):
-        host = ''
+    def _create_managers(self, host, n_plankton):
+        print 'Creating Queue Managers...'
         ini_port = 10001
         auth_key = 'chaetognata'
         self.qm = {}
@@ -58,25 +59,30 @@ class Kami(object):
             self.qm[p]['server'] = self._create_queue_server(host, port, auth_key,
                                                              self.qm[p]['q_in'],
                                                              self.qm[p]['q_out'])
+            print '\tQM - %i \tport: %i' % (p, port)
 
 
     def _populate_plankton(self):
+        print 'Populating Planktons...'
         portions = utils.chunks(range(self.wally.shape[0]),
                                 self.wally.shape[0]/len(self.qm.keys()))
         for p in self.qm.keys():
             r = portions.next()
             self.qm[p]['range'] = (r[0], r[-1])
             self.qm[p]['q_in'].put([self.capacity, self.mutation,r[0],
-                                    self.wally[r[0]:r[-1]],
-                                    self.meteo[:,r[0]:r[-1]],
+                                    self.wally[r[0]:r[-1]+1],
+                                    self.meteo[:,r[0]:r[-1]+1],
                                     self.nada])
+            print '\tQM - %i \trange: %i - %i' % (p, r[0], r[-1])
 
 
     def loop(self):
         t_loop = time.time()
         self.tick += 1
+        #print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
 
         # rookies in
+        #print 'rookies IN'
         for p in self.qm.keys():
             rookies = {}
             q = self.qm[p]['range']
@@ -87,8 +93,11 @@ class Kami(object):
                     for rr in self.rookies[r]:
                         rookies[r].append(rr)
             self.qm[p]['q_in'].put([self.tick, rookies])
+            #print '\tQM: %i --> %i rookies' % (p, len(rookies))
+            #print '\t', rookies.keys()
 
         # rookies out
+        #print 'rookies OUT'
         self.rookies = {}
         plankton = range(len(self.qm.keys()))
         while len(plankton):
@@ -101,19 +110,24 @@ class Kami(object):
                             self.rookies[r] = []
                         for rr in rookies[r]:
                             self.rookies[r].append(rr)
+                    #print '\tQM: %i <-- %i new rookies' % (p, len(rookies))
+                    #print '\t', rookies.keys()
 
         print 'Looping... %i - %.2f secs' % (self.tick, time.time()-t_loop)
         if not self.tick % self.savepoint:
-            print 'CheckPoint!... %i' % self.tick
+            print 'CheckPoint!'
             self.checkpoint()
 
 
     def _update_request(self):
         # in
+        #print 'update IN'
         for p in self.qm.keys():
             self.qm[p]['q_in'].put([])
+            #print '\tQM: %i --> request update' % p
 
         # out
+        #print 'update OUT'
         plankton = range(len(self.qm.keys()))
         while len(plankton):
             for p in plankton:
@@ -121,23 +135,36 @@ class Kami(object):
                     plankton.remove(p)
                     wally = self.qm[p]['q_out'].get()
                     r = self.qm[p]['range']
-                    self.wally[r[0]:r[-1]] = wally
-
+                    self.wally[r[0]:r[-1]+1] = wally
+                    #print '\tQM: %i --> updated' % p
 
 
     def checkpoint(self):
         self._update_request()
+        filename = '/home/luccox/KAMI/wally/wally_%i.png' % (self.tick)
+        occupation = numpy.array([len(self.wally[self.wally[i,j,:,0] != 0])
+                                      for i in xrange(self.size)
+                                      for j in xrange(self.size)]).reshape(self.size,self.size)
+        utils.check_dir('wally')
+        utils.pyplot_from_array(filename, occupation, self.capacity)
+        print 'plot saved in %s' % filename
+
         self.conn.root['conf']['tick'] = self.tick
         self.conn.root['wally'] = self.wally
         self.conn.root['rookies'] = self.rookies
         self.conn.commit()
+        print 'data saved in DB'
 
-    def close(self):
-        self.checkpoint()
+
+    def close(self, cp=False):
+        if cp:
+            self.checkpoint()
         self.conn.close()
         self.db.close()
-        for c in self.qm:
-            self.qm[c]['server'].shutdown()
+        print 'Stopping Queue Managers...'
+        for p in self.qm:
+            self.qm[p]['server'].shutdown()
+            print '\tQM: %i --> closed' % p
 
         print '\nclosing GAIA... bye bye\n'
 

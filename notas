@@ -42,13 +42,16 @@ import builder
 b = builder.Builder(100)
 
 import kami
-k = kami.Kami(n_plankton=2)
-#for i in xrange(5):
-k.loop()
+k = kami.Kami(n_plankton=4)
+for i in xrange(10):
+    k.checkpoint()
+    for ii in xrange(10):
+        k.loop()
+
 
 #k.checkpoint()
 k.close()
-
+k.close(cp=True)
 
 
 import plankton
@@ -58,9 +61,22 @@ while True:
     p.loop()
 
 
-
 import plankton
 p = plankton.Plankton(port=10002)
+p.boot()
+while True:
+    p.loop()
+
+
+import plankton
+p = plankton.Plankton(port=10003)
+p.boot()
+while True:
+    p.loop()
+
+
+import plankton
+p = plankton.Plankton(port=10004)
 p.boot()
 while True:
     p.loop()

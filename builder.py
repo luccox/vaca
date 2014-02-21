@@ -11,7 +11,7 @@ import utils
 
 
 class Builder(object):
-    def __init__(self, size, mutation=0.1, capacity=10, meteo_min=0, meteo_max=10):
+    def __init__(self, size, mutation=0.1, capacity=10, meteo_min=0, meteo_max=8):
         self.size = size
         self.mutation = mutation
         self.capacity = capacity
@@ -68,10 +68,13 @@ class Builder(object):
         f_agua = 50
         f_pool = 50
         f_meta = 3000
-        for pos in [(self.size/4, self.size/4), \
-                    (self.size/4, 3*self.size/4), \
-                    (3*self.size/4, self.size/4), \
-                    (3*self.size/4, 3*self.size/4)]:
+        #[(self.size/4, self.size/4),
+        #(self.size/4, 3*self.size/4),
+        #(3*self.size/4, self.size/4),
+        #(3*self.size/4, 3*self.size/4)]
+        adanes = [(14, 70), (38, 70), (64, 70), (82, 70),
+                  (14, 30), (38, 30), (64, 30), (82, 30)]
+        for pos in adanes:
             conn.root['wally'][pos[0],pos[1]][0] = [p_gen,p_start,p_nrg,f_gen,f_max,f_num, \
                                                     f_nrg,f_sex,f_luz,f_agua,f_pool,f_meta]
 

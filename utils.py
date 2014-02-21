@@ -6,6 +6,9 @@ import numpy
 import shutil
 import random
 import datetime
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot
 from collections import Counter
 
 
@@ -61,3 +64,15 @@ def profile_fito(f):
 11   8   f_meta      metab_req           int/100         f_meta = 3.0        300/100
 '''
 
+
+def pyplot_from_array(filename, matrix, val_max, val_min=0):
+    fig, ax = matplotlib.pyplot.subplots()
+    cmap = matplotlib.cm.jet #BuGn
+    norm = matplotlib.colors.Normalize(vmin=val_min, vmax=val_max)
+    cax = ax.imshow(matrix, interpolation='bilinear', norm=norm, cmap=cmap) # nearest, bilinear, bicubic
+    cbar = fig.colorbar(cax)
+    #ax.set_title(label)
+    matplotlib.pyplot.savefig(filename)
+    shutil.copyfile(filename, '/home/luccox/KAMI/wally/web_populationmap.png')
+    #matplotlib.pyplot.show()
+    matplotlib.pyplot.close()

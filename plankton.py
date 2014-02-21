@@ -8,10 +8,11 @@ from multiprocessing.managers import SyncManager
 
 
 class Plankton(object):
-    def __init__(self, host='localhost', port=10001, auth_key='chaetognata'):
+    def __init__(self, host, port, auth_key='chaetognata'):
         qm = self._create_queue_client(host, port, auth_key)
         self.q_in = qm.get_queue_in()
         self.q_out = qm.get_queue_out()
+
 
     def boot(self):
         init_data = self.q_in.get()
@@ -216,7 +217,7 @@ class Plankton(object):
                                             if d not in new_rookies.keys():
                                                 new_rookies[d] = []
                                             new_rookies[d].append(p.tolist())
-                                            print '+ rookie ', d
+                                            #print '+ rookie ', d
                                         p[2] = int(p_nrg_post_sex*1000)
                                         #print 'Fito - final --> ', p[2]
                                     else:
@@ -234,6 +235,7 @@ class Plankton(object):
 
                     self.wally[x,y] = chunk
 
+            #print new_rookies.keys()
             self.q_out.put(new_rookies)
 
         else:
