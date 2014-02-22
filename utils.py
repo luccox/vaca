@@ -23,13 +23,13 @@ def chunks(l, n):
 
 
 def check_dir(d):
-    dd = '/home/luccox/KAMI/%s' % d
+    dd = '/home/luccox/GAIA/KAMI/%s' % d
     if not os.path.exists(dd):
         os.makedirs(dd)
 
 
 def empty_dir(d):
-    dd = '/home/luccox/KAMI/%s' % d
+    dd = '/home/luccox/GAIA/KAMI/%s' % d
     for i in os.listdir(dd):
         os.remove('%s/%s' % (dd, i))
 
@@ -73,6 +73,6 @@ def pyplot_from_array(filename, matrix, val_max, val_min=0):
     cbar = fig.colorbar(cax)
     #ax.set_title(label)
     matplotlib.pyplot.savefig(filename)
-    shutil.copyfile(filename, '/home/luccox/KAMI/wally/web_populationmap.png')
+    shutil.copyfile(filename, '/home/luccox/GAIA/KAMI/wally/web_populationmap.png')
     #matplotlib.pyplot.show()
     matplotlib.pyplot.close()

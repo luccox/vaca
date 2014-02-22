@@ -8,15 +8,15 @@ import time
 
 def start_kami(delay):
     import kami
-    k = kami.Kami(n_plankton=3)
-    time.sleep(delay)
+    k = kami.Kami('192.168.1.111', n_plankton=3)
+    time.sleep(float(delay))
     while True:
         k.loop()
 
 
 def start_plankton(pt):
     import plankton
-    p = plankton.Plankton(host='192.168.1.111', port=pt)
+    p = plankton.Plankton('192.168.1.111', int(pt))
     p.boot()
     while True:
         p.loop()

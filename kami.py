@@ -48,7 +48,7 @@ class Kami(object):
 
     def _create_managers(self, host, n_plankton):
         print 'Creating Queue Managers...'
-        ini_port = 10001
+        ini_port = 18881
         auth_key = 'chaetognata'
         self.qm = {}
         for p in xrange(n_plankton):
@@ -141,7 +141,7 @@ class Kami(object):
 
     def checkpoint(self):
         self._update_request()
-        filename = '/home/luccox/KAMI/wally/wally_%i.png' % (self.tick)
+        filename = '/home/luccox/GAIA/KAMI/wally/wally_%i.png' % (self.tick)
         occupation = numpy.array([len(self.wally[self.wally[i,j,:,0] != 0])
                                       for i in xrange(self.size)
                                       for j in xrange(self.size)]).reshape(self.size,self.size)

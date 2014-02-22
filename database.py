@@ -7,7 +7,7 @@ import transaction
 
 class Database(object):
     def __init__(self):
-        self.storage = FileStorage.FileStorage('/home/luccox/KAMI/db/db.fs')
+        self.storage = FileStorage.FileStorage('/home/luccox/GAIA/KAMI/db/db.fs')
         self.db = DB(self.storage)
 
     def do_pack(self):

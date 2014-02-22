@@ -42,7 +42,7 @@ import builder
 b = builder.Builder(100)
 
 import kami
-k = kami.Kami(n_plankton=4)
+k = kami.Kami('', n_plankton=3)
 for i in xrange(10):
     k.checkpoint()
     for ii in xrange(10):
