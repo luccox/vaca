@@ -239,5 +239,5 @@ class Plankton(object):
             self.q_out.put(new_rookies)
 
         else:
-            print 'updating GAIA...'
+            #print 'updating GAIA...'
             self.q_out.put(self.wally)

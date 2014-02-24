@@ -67,12 +67,24 @@ def profile_fito(f):
 
 def pyplot_from_array(filename, matrix, val_max, val_min=0):
     fig, ax = matplotlib.pyplot.subplots()
-    cmap = matplotlib.cm.jet #BuGn
+    cmap = matplotlib.cm.BuGn
     norm = matplotlib.colors.Normalize(vmin=val_min, vmax=val_max)
     cax = ax.imshow(matrix, interpolation='bilinear', norm=norm, cmap=cmap) # nearest, bilinear, bicubic
     cbar = fig.colorbar(cax)
-    #ax.set_title(label)
-    matplotlib.pyplot.savefig(filename)
-    shutil.copyfile(filename, '/home/luccox/GAIA/KAMI/wally/web_populationmap.png')
+    cbar.ax.tick_params(labelcolor='w')
+    ax.set_title(filename)
+    ax.spines['bottom'].set_color('w')
+    ax.spines['top'].set_color('w')
+    ax.spines['left'].set_color('w')
+    ax.spines['right'].set_color('w')
+    ax.xaxis.label.set_color('w')
+    ax.yaxis.label.set_color('w')
+    ax.tick_params(axis='x', colors='w')
+    ax.tick_params(axis='y', colors='w')
+    matplotlib.pyplot.savefig('/home/luccox/GAIA/KAMI/wally/%s.png' % filename.zfill(5), facecolor='#111111', edgecolor='none')
+    #shutil.copyfile(filename, '/home/luccox/GAIA/KAMI/wally/web_populationmap.png')
     #matplotlib.pyplot.show()
     matplotlib.pyplot.close()
+
+
+

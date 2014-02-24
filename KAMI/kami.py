@@ -12,7 +12,7 @@ import utils
 
 class Kami(object):
     def __init__(self, host, n_plankton=1, savepoint=100):
-        print '\nLoading Kami 5.2\n'
+        print '\nLoading Kami 5.4\n'
 
         self.savepoint = savepoint
 
@@ -30,6 +30,7 @@ class Kami(object):
         self.rookies = self.conn.root['rookies']
 
         self._create_managers(host, n_plankton)
+        self._create_gaiaweb()
         self._populate_plankton()
 
 
@@ -46,9 +47,8 @@ class Kami(object):
         return manager
 
 
-    def _create_managers(self, host, n_plankton):
+    def _create_managers(self, host, n_plankton, ini_port=18881):
         print 'Creating Queue Managers...'
-        ini_port = 18881
         auth_key = 'chaetognata'
         self.qm = {}
         for p in xrange(n_plankton):
@@ -59,7 +59,7 @@ class Kami(object):
             self.qm[p]['server'] = self._create_queue_server(host, port, auth_key,
                                                              self.qm[p]['q_in'],
                                                              self.qm[p]['q_out'])
-            print '\tQM - %i \tport: %i' % (p, port)
+            print '\tPLANKTON QM - %i \tport: %i' % (p, port)
 
 
     def _populate_plankton(self):
@@ -73,13 +73,32 @@ class Kami(object):
                                     self.wally[r[0]:r[-1]+1],
                                     self.meteo[:,r[0]:r[-1]+1],
                                     self.nada])
-            print '\tQM - %i \trange: %i - %i' % (p, r[0], r[-1])
+            print '\tPLANKTON QM - %i \trange: %i - %i' % (p, r[0], r[-1])
+
+
+    def _create_gaiaweb(self, port=18880):
+        self.web = {}
+        self.web['q_in'] = multiprocessing.Queue()
+        self.web['q_out'] = multiprocessing.Queue()
+        self.web['server'] = self._create_queue_server('localhost', port, 'chaetognata',
+                                                       self.web['q_in'],
+                                                       self.web['q_out'])
+        print '\WEB QM\tport: %i' % port
 
 
     def loop(self):
         t_loop = time.time()
         self.tick += 1
         #print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+
+        # WEB in
+        if self.web['q_out'].qsize():
+            request = self.web['q_out'].get()
+            if request == 'get_turn':
+                self.web['q_in'].put(str(self.tick))
+            elif request == 'close':
+                self.close(cp=True)
+                self.web['q_in'].put('DB closed')
 
         # rookies in
         #print 'rookies IN'
@@ -93,7 +112,7 @@ class Kami(object):
                     for rr in self.rookies[r]:
                         rookies[r].append(rr)
             self.qm[p]['q_in'].put([self.tick, rookies])
-            #print '\tQM: %i --> %i rookies' % (p, len(rookies))
+            #print '\tPLANKTON QM: %i --> %i rookies' % (p, len(rookies))
             #print '\t', rookies.keys()
 
         # rookies out
@@ -110,7 +129,7 @@ class Kami(object):
                             self.rookies[r] = []
                         for rr in rookies[r]:
                             self.rookies[r].append(rr)
-                    #print '\tQM: %i <-- %i new rookies' % (p, len(rookies))
+                    #print '\tPLANKTON QM: %i <-- %i new rookies' % (p, len(rookies))
                     #print '\t', rookies.keys()
 
         print 'Looping... %i - %.2f secs' % (self.tick, time.time()-t_loop)
@@ -124,7 +143,7 @@ class Kami(object):
         #print 'update IN'
         for p in self.qm.keys():
             self.qm[p]['q_in'].put([])
-            #print '\tQM: %i --> request update' % p
+            #print '\tPLANKTON QM: %i --> request update' % p
 
         # out
         #print 'update OUT'
@@ -136,24 +155,21 @@ class Kami(object):
                     wally = self.qm[p]['q_out'].get()
                     r = self.qm[p]['range']
                     self.wally[r[0]:r[-1]+1] = wally
-                    #print '\tQM: %i --> updated' % p
+                    #print '\tPLANKTON QM: %i --> updated' % p
 
 
     def checkpoint(self):
         self._update_request()
-        filename = '/home/luccox/GAIA/KAMI/wally/wally_%i.png' % (self.tick)
         occupation = numpy.array([len(self.wally[self.wally[i,j,:,0] != 0])
                                       for i in xrange(self.size)
                                       for j in xrange(self.size)]).reshape(self.size,self.size)
         utils.check_dir('wally')
-        utils.pyplot_from_array(filename, occupation, self.capacity)
-        print 'plot saved in %s' % filename
+        utils.pyplot_from_array(str(self.tick), occupation, self.capacity)
 
         self.conn.root['conf']['tick'] = self.tick
         self.conn.root['wally'] = self.wally
         self.conn.root['rookies'] = self.rookies
         self.conn.commit()
-        print 'data saved in DB'
 
 
     def close(self, cp=False):
@@ -164,9 +180,11 @@ class Kami(object):
         print 'Stopping Queue Managers...'
         for p in self.qm:
             self.qm[p]['server'].shutdown()
-            print '\tQM: %i --> closed' % p
+            print '\tPLANKTON QM: %i --> closed' % p
+        self.web['server'].shutdown()
+        print '\tWEB QM --> closed'
 
-        print '\nclosing GAIA... bye bye\n'
+        print '\nclosing KAMI... bye bye\n'
 
 
 

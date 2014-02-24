@@ -1,12 +1,33 @@
 #!/usr/bin/python2
 # -*- coding: utf-8 -*-
 
+import multiprocessing
+from multiprocessing.managers import SyncManager
 
 import cherrypy
 import os
+import time
 
 
 class GaiaWeb(object):
+    def __init__(self):
+        qm = self._create_queue_client()
+        self.q_in = qm.get_queue_in()
+        self.q_out = qm.get_queue_out()
+
+
+    def _create_queue_client(self, port=18880, auth_key='chaetognata'):
+
+        class QueueManager(SyncManager):
+            pass
+
+        QueueManager.register('get_queue_in')
+        QueueManager.register('get_queue_out')
+        manager = QueueManager(address=('localhost', port), authkey=auth_key)
+        manager.connect() # This starts the connected client
+
+        return manager
+
 
     def _htmlize(self, head='', header='', body=''):
         html = '''<!DOCTYPE html>
@@ -32,6 +53,28 @@ class GaiaWeb(object):
 '''
         return html % (head, header, body)
 
+
+    def get_turn(self):
+        self.q_out.put('get_turn')
+        while not self.q_in.qsize():
+            time.sleep(0.1)
+        turn = self.q_in.get()
+        b = '''<p>  %s  </p>''' % turn
+        html = self._htmlize(body=b)
+        return html
+
+    get_turn.exposed = True
+
+    def closeDB(self):
+        self.q_out.put('close')
+        while not self.q_in.qsize():
+            time.sleep(0.1)
+        turn = self.q_in.get()
+        b = '''<p>  %s  </p>''' % turn
+        html = self._htmlize(body=b)
+        return html
+
+    get_turn.exposed = True
 
 
     def index(self):

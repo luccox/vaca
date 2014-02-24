@@ -11,7 +11,7 @@ import utils
 
 
 class Builder(object):
-    def __init__(self, size, mutation=0.1, capacity=10, meteo_min=0, meteo_max=8):
+    def __init__(self, size, mutation=0.1, capacity=10, meteo_min=0, meteo_max=5):
         self.size = size
         self.mutation = mutation
         self.capacity = capacity
